@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Virtual env
+.venv/
+env/
+venv/
+
+# Data & runs
+electricitydemandforecaster/runs
+data/raw
+data/processed
+
+*.csv
+*.pt
+*.pkl
+
+.DS_Store
+*.egg-info/
+
+notebooks/98_processSQL.ipynb
+notebooks/99_trainings_colab.ipynb
+
+
+test.py

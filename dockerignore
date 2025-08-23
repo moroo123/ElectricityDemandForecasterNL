@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.db
+*.sqlite3
+
+# Virtual envs & tooling
+.venv/
+env/
+.idea/
+.vscode/
+pytest_cache/
+.coverage
+dist/
+build/
+
+# Git
+.git
+.gitignore
+
+# OS
+.DS_Store
+
+# Data & artifacts you’ll mount at runtime
+electricitydemandforecaster/runs/
+models/

@@ -1,0 +1,17 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "electricity-forecaster"
+version = "0.1.0"
+requires-python = ">=3.10"
+dependencies = [
+  "numpy", "pandas", "torch", "scikit-learn==1.6.1", "matplotlib", "pyyaml", "joblib", "holidays","ipykernel", "tqdm", "xgboost", "ipywidgets"
+]
+
+[tool.setuptools]
+package-dir = { "" = "src" }
+
+[tool.setuptools.packages.find]
+where = ["src"]

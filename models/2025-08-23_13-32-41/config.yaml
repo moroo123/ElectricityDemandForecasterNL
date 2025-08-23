@@ -1,0 +1,43 @@
+cv:
+  n_splits: 5
+data:
+  columns:
+  - utc_timestamp
+  - NL_load_actual_entsoe_transparency
+  freq_minutes: 15
+  horizon: 96
+  lookback: 1440
+  source: data/sample/time_series_sample.sqlite
+  table: time_series_15min_singleindex
+  target: NL_load_actual_entsoe_transparency
+  timestamp_col: utc_timestamp
+  timestamp_format: '%Y-%m-%dT%H:%M:%SZ'
+features:
+  lags:
+  - 0
+  - 1
+  - 4
+  - 12
+  - 96
+  - 672
+  rolls:
+  - 96
+  - 288
+  - 672
+model:
+  dropout: 0.3
+  hidden_size: 256
+  input_size: 23
+  name: BaselineLSTM
+  num_layers: 3
+  output_size: 96
+seed: 42
+split:
+  train_val_split: 0.9
+  trainval_test_split: 0.8
+train:
+  batch_size: 256
+  epochs: 100
+  learning_rate: 0.0005
+  patience: 10
+  weight_decay: 0
