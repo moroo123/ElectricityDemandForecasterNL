@@ -123,7 +123,7 @@ def _fit_one(model: nn.Module, train_dataloader: DataLoader, val_dataloader: Dat
     return best_val_loss
 
 
-def cross_validate(df: pd.DataFrame, model_name: str, target_column: str, lags: list[int], rolls: list[int], lookback: int, horizon: int, model_kwargs: dict, batch_size: int, n_splits: int, epochs: int, lr: float, weight_decay: float = 0.0, patience: int = 10, seed: int = 42):
+def cross_validate(df: pd.DataFrame, model_name: str, target_column: str, df_weather: pd.DataFrame | None,  lags: list[int], rolls: list[int], lookback: int, horizon: int, model_kwargs: dict, batch_size: int, n_splits: int, epochs: int, lr: float, weight_decay: float = 0.0, patience: int = 10, seed: int = 42):
     """Train the model using cross-validation.
 
     Args:
@@ -150,7 +150,7 @@ def cross_validate(df: pd.DataFrame, model_name: str, target_column: str, lags: 
     set_seed(seed)
 
     X_df, y_df = build_feature_dataframe(
-        df, target_column, lags=lags, rolls=rolls)
+        df, target_column, df_weather=df_weather, lags=lags, rolls=rolls)
 
     X = X_df.to_numpy(dtype='float32')
     y = y_df.to_numpy(dtype='float32')
@@ -202,13 +202,14 @@ def cross_validate(df: pd.DataFrame, model_name: str, target_column: str, lags: 
     return (np.mean(fold_losses), np.std(fold_losses), cv_splits)
 
 
-def train_final(df: pd.DataFrame, model_name: str, target_column: str, lags: list[int], rolls: list[int], lookback: int, horizon: int, model_kwargs: dict, batch_size: int,  epochs: int, lr: float, weight_decay: float = 0.0, train_val_split: float = 0.9, patience: int = 10, seed: int = 42, ):
+def train_final(df: pd.DataFrame, model_name: str, target_column: str, df_weather: pd.DataFrame | None, lags: list[int], rolls: list[int], lookback: int, horizon: int, model_kwargs: dict, batch_size: int,  epochs: int, lr: float, weight_decay: float = 0.0, train_val_split: float = 0.9, patience: int = 10, seed: int = 42, ):
     """Train the final model on the entire dataset.
 
     Args:
         df (pd.DataFrame): The input dataframe.
         model_name (str): The name of the model to train.
         target_column (str): The name of the target column.
+        df_weather (pd.DataFrame | None): The weather data dataframe.
         lags (list[int]): The list of lagged features to use.
         rolls (list[int]): The list of rolling window features to use.
         lookback (int): The number of time steps to look back.
@@ -227,8 +228,9 @@ def train_final(df: pd.DataFrame, model_name: str, target_column: str, lags: lis
         tuple: A tuple containing the trained model, the scaler for X, and the scaler for y.
     """
     set_seed(seed)
+
     X_df, y_df = build_feature_dataframe(
-        df, target_column, lags=lags, rolls=rolls)
+        df, target_column, df_weather=df_weather, lags=lags, rolls=rolls)
 
     X = X_df.to_numpy(dtype='float32')
     y = y_df.to_numpy(dtype='float32')

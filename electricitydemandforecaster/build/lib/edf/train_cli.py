@@ -12,7 +12,7 @@ from tqdm.auto import tqdm
 import joblib
 
 
-def main(db_path: str, table_name: str, config_path: str, runs_root: str = "runs", run_cv: bool = True, fraction: int = 1):
+def main(db_path: str, table_name: str, db_path_weather: str | None = None, table_name_weather: str | None = None, config_path: str = 'configs', runs_root: str = 'runs', run_cv: bool = True, fraction: int = 1):
     """Train the model using the specified configuration.
     """
 
@@ -24,6 +24,15 @@ def main(db_path: str, table_name: str, config_path: str, runs_root: str = "runs
         db_path, table_name, column_names, timestamp_col, timestamp_format,)
 
     df = df.iloc[:(len(df)//fraction)]
+    if table_name_weather != 'None':
+        column_names_weather = ['utc_timestamp', 'NL_temperature']
+        timestamp_col = 'utc_timestamp'
+        timestamp_format = '%Y-%m-%dT%H:%M:%SZ'
+        df_weather = read_dataframe_from_sql(
+            db_path_weather, table_name_weather, column_names_weather, timestamp_col, timestamp_format,)
+    else:
+        df_weather = None
+        print('No weather data provided')
 
     with open(config_path, 'r') as f:
         config = yaml.safe_load(f)
@@ -57,7 +66,7 @@ def main(db_path: str, table_name: str, config_path: str, runs_root: str = "runs
 
             # Run cross-validation
             mean_cv, std_cv, splits = cross_validate(
-                df_trainval, model_name, target, lags, rolls, lookback,
+                df_trainval, model_name, target, df_weather, lags, rolls, lookback,
                 horizon, model_kwargs,
                 batch_size=cfg['train']['batch_size'],
                 n_splits=cfg['cv']['n_splits'],
@@ -102,7 +111,7 @@ def main(db_path: str, table_name: str, config_path: str, runs_root: str = "runs
         'name']}
 
     model, scaler_X, scaler_y, input_size, final_val_loss = train_final(
-        df_trainval, model_name, target, lags, rolls, lookback,
+        df_trainval, model_name, target, df_weather, lags, rolls, lookback,
         horizon, model_kwargs,
         batch_size=best_cfg['train']['batch_size'],
         epochs=best_cfg['train']['epochs'],
@@ -169,6 +178,10 @@ if __name__ == '__main__':
                         default='data/raw/time_series.sqlite', help='Path to SQLite database')
     parser.add_argument('--table-name', type=str,
                         default='time_series_15min_singleindex', help='Table name in the database')
+    parser.add_argument('--db-path-weather', type=str,
+                        default='None', help='Path to SQLite database containing weather data')
+    parser.add_argument('--table-name-weather', type=str,
+                        default='None', help='Table name in the database')
     parser.add_argument('--config', type=str,
                         default='configs/base.yaml', help='YAML config file')
     parser.add_argument('--runs-root', type=str,
@@ -181,6 +194,8 @@ if __name__ == '__main__':
 
     main(db_path=args.db_path,
          table_name=args.table_name,
+         db_path_weather=args.db_path_weather,
+         table_name_weather=args.table_name_weather,
          config_path=args.config,
          runs_root=args.runs_root,
          run_cv=args.crossvalidate.lower() in ('true', '1', 'yes'),
@@ -188,4 +203,6 @@ if __name__ == '__main__':
 
     sys.exit(0)
 
-# python3 electricitydemandforecaster/src/edf/train_cli.py --db-path data/raw/time_series.sqlite --table-name time_series_15min_singleindex --config electricitydemandforecaster/configs/base_lstm_minimal.yaml --runs-root electricitydemandforecaster/runs --fraction 50
+# python3 -m edf.train_cli --db-path data/raw/time_series.sqlite --table-name time_series_15min_singleindex --db-path-weather data/raw/weather_data.sqlite --table-name-weather weather_data --config electricitydemandforecaster/configs/base_lstm_optimization.yaml --crossvalidate false --runs-root electricitydemandforecaster/runs --fraction 60
+
+# python3 -m edf.train_cli --db-path ../data/raw/time_series.sqlite --table-name time_series_15min_singleindex --db-path-weather ../data/raw/weather_data.sqlite --table-name-weather weather_data --config configs/base_lstm_optimization.yaml --crossvalidate false --runs-root runs --fraction 60

@@ -89,16 +89,46 @@ def build_lagroll_features(df: pd.DataFrame, target_column: str, lags: list[int]
     return df_return
 
 
-def build_feature_dataframe(df: pd.DataFrame, target_column: str, lags: list[int] | None = None, rolls: list[int] | None = None):
+def align_weather_to_index(df_weather: pd.DataFrame, index: pd.DatetimeIndex, method: str = 'ffill', tolerance: str = '45min'):
+    """Align weather dataframe to the given index by reindexing and interpolating.
+
+    Args:
+        df_weather (pd.DataFrame): Input weather dataframe.
+        index (pd.DatetimeIndex): Target index to align to.
+        method (str): Interpolation method to use (default is 'ffill').
+        tolerance (str): Maximum distance between original and interpolated index (default is '45min').
+    Raises:
+        TypeError: If the index of the weather dataframe is not a DatetimeIndex.
+
+    Returns:
+        pd.DataFrame: Aligned weather dataframe.
+    """
+    if not isinstance(df_weather.index, pd.DatetimeIndex):
+        raise TypeError(
+            f"Index of dataframe must be pd.DatetimeIndex, got {type(df_weather.index).__name__}")
+
+    df_w = df_weather.sort_index().copy()
+    target_index = index.sort_values().copy()
+
+    if method == 'ffill':
+        df_weather_aligned = df_weather.reindex(target_index, method='ffill')
+    elif method == 'nearest':
+        df_weather_aligned = df_weather.reindex(
+            target_index, method='nearest', tolerance=pd.Timedelta(nearest_tolerance))
+
+    return df_weather_aligned
+
+
+def build_feature_dataframe(df: pd.DataFrame, target_column: str, df_weather: pd.DataFrame | None = None,  lags: list[int] | None = None, rolls: list[int] | None = None):
     """Build feature and target dataframes from the input dataframe.
 
     Args:
-        df (pd.DataFrame): Input dataframe containing the features and target.
-        target_column (str): Name of the target column.
-        lags (list[int] | None): List of lag periods.
-        rolls (list[int] | None): List of rolling window sizes.
+        df(pd.DataFrame): Input dataframe containing the features and target.
+        target_column(str): Name of the target column.
+        lags(list[int] | None): List of lag periods.
+        rolls(list[int] | None): List of rolling window sizes.
     Returns:
-        tuple: A tuple containing the feature dataframe (X) and target dataframe (y).
+        tuple: A tuple containing the feature dataframe(X) and target dataframe(y).
     """
 
     df_time_features = build_time_features(df)
@@ -106,8 +136,15 @@ def build_feature_dataframe(df: pd.DataFrame, target_column: str, lags: list[int
     df_lagroll_features = build_lagroll_features(
         df, target_column, lags, rolls)
 
-    X = pd.concat([df_time_features, df_holiday_features,
-                  df_lagroll_features], axis=1)
+    if df_weather is not None:
+        df_weather = align_weather_to_index(
+            df_weather, df.index, method='ffill')
+
+        X = pd.concat([df_time_features, df_holiday_features,
+                       df_lagroll_features, df_weather], axis=1)
+    else:
+        X = pd.concat([df_time_features, df_holiday_features,
+                       df_lagroll_features], axis=1)
 
     y = df[[target_column]].copy()
 
