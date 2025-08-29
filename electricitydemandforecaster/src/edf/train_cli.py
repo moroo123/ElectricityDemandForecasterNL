@@ -25,7 +25,8 @@ def main(db_path: str, table_name: str, db_path_weather: str | None = None, tabl
 
     df = df.iloc[:(len(df)//fraction)]
     if table_name_weather != 'None':
-        column_names_weather = ['utc_timestamp', 'NL_temperature']
+        column_names_weather = [
+            'utc_timestamp', 'NL_temperature', 'NL_radiation_direct_horizontal']
         timestamp_col = 'utc_timestamp'
         timestamp_format = '%Y-%m-%dT%H:%M:%SZ'
         df_weather = read_dataframe_from_sql(
