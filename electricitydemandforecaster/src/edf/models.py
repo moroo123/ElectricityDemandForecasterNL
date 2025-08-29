@@ -49,9 +49,9 @@ class BaselineLSTM(nn.Module):
         return out
 
 
-class CNN_LSTM(nn.Module):
+class CnnLSTM(nn.Module):
     """
-    CNN_LSTM model for time series forecasting.
+    Cnn_LSTM model for time series forecasting.
     """
 
     def __init__(self,
@@ -144,5 +144,5 @@ class CNN_LSTM(nn.Module):
 
 MODEL_REGISTRY = {
     'BaselineLSTM': BaselineLSTM,
-    'CNN_LSTM': CNN_LSTM,
+    'CnnLSTM': CnnLSTM,
 }

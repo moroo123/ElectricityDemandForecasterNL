@@ -145,7 +145,7 @@ def build_feature_dataframe(df: pd.DataFrame, target_column: str, df_weather: pd
     else:
         X = pd.concat([df_time_features, df_holiday_features,
                        df_lagroll_features], axis=1)
-    print(X.columns)
+
     y = df[[target_column]].copy()
 
     combined = pd.concat([X, y], axis=1).dropna()
