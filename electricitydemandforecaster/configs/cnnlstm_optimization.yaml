@@ -1,0 +1,69 @@
+seed: 42
+data:
+  target: NL_load_actual_entsoe_transparency
+  freq_minutes: 15
+  lookback: 720
+  horizon: 96
+features:
+  lags:
+  - 0
+  - 1
+  - 4
+  - 12
+  - 96
+  # - 672
+  # - 2880
+  rolls:
+  - 96
+  - 288 
+  # - 672 
+  # - 2016
+  # - 2880
+model:
+  name: CnnLSTM
+  # CNN properties
+  conv_channels:
+  - 32
+  - 64
+  num_conv_layers:
+  - 2
+  - 3
+  kernel_size:
+  - 3
+  dilation_base:
+  - 2
+  conv_dropout:
+  - 0.2
+  use_batchnorm:
+  - true
+  # LSTM properties 
+  hidden_size: 
+  - 256
+  - 512
+  num_layers: 
+  - 2
+  - 3
+  dropout: 
+  - 0.2
+  - 0.3
+  - 0.4
+train:
+  batch_size: 
+  # - 128
+  - 256
+  learning_rate: 
+  # - 0.001
+  - 0.0005
+  # - 0.0001
+  weight_decay: 
+  - 0.0001
+  - 0
+  epochs: 
+  - 100
+  patience: 
+  - 10
+cv:
+  n_splits: 5
+split:
+  trainval_test_split: 0.8
+  train_val_split: 0.9

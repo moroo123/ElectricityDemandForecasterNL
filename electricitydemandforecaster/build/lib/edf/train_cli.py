@@ -24,6 +24,7 @@ def main(db_path: str, table_name: str, db_path_weather: str | None = None, tabl
         db_path, table_name, column_names, timestamp_col, timestamp_format,)
 
     df = df.iloc[:(len(df)//fraction)]
+
     if table_name_weather != 'None':
         column_names_weather = [
             'utc_timestamp', 'NL_temperature', 'NL_radiation_direct_horizontal']

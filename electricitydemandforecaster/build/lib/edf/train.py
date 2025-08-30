@@ -189,7 +189,7 @@ def cross_validate(df: pd.DataFrame, model_name: str, target_column: str, df_wea
         # Create dataloaders
         train_dataloader = DataLoader(train_dataset, batch_size, shuffle=False)
         val_dataloader = DataLoader(val_dataset, batch_size, shuffle=False)
-
+        print(MODEL_REGISTRY)
         input_size = X.shape[1]
         model = MODEL_REGISTRY[model_name](
             input_size=input_size, **model_kwargs, output_size=horizon).to(DEVICE)

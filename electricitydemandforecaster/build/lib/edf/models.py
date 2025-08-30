@@ -76,8 +76,7 @@ class CnnLSTM(nn.Module):
         self.hidden_size = hidden_size
         self.output_size = output_size
         self.num_layers = num_layers
-        print(conv_channels, num_conv_layers, kernel_size,
-              dilation_base, conv_dropout, use_batchnorm)
+
         # Define CNN
         conv_layers = []
         conv_kernel_dilations = []

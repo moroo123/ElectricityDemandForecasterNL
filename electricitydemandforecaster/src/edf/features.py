@@ -114,7 +114,7 @@ def align_weather_to_index(df_weather: pd.DataFrame, index: pd.DatetimeIndex, me
         df_weather_aligned = df_weather.reindex(target_index, method='ffill')
     elif method == 'nearest':
         df_weather_aligned = df_weather.reindex(
-            target_index, method='nearest', tolerance=pd.Timedelta(nearest_tolerance))
+            target_index, method='nearest', tolerance=pd.Timedelta(tolerance))
 
     return df_weather_aligned
 
