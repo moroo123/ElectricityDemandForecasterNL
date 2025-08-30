@@ -21,6 +21,8 @@ data/processed
 .DS_Store
 *.egg-info/
 
+lib/
+
 notebooks/98_processSQL.ipynb
 notebooks/99_trainings_colab.ipynb
 
