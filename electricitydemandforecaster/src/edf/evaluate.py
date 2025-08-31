@@ -111,13 +111,22 @@ def run_test(run_dir: Path, plot_horizons: list[int], save_plots: bool = True):
                                  timestamp_col=config['data']['timestamp_col'],
                                  timestamp_format=config['data']['timestamp_format'], )
 
+    if config['data']['weather']['use']:
+        df_weather = read_dataframe_from_sql(db_path=config['data']['weather']['source'],
+                                             table_name=config['data']['weather']['table'],
+                                             column_names=config['data']['weather']['columns'],
+                                             timestamp_col=config['data']['weather']['timestamp_col'],
+                                             timestamp_format=config['data']['weather']['timestamp_format'], )
+    else:
+        df_weather = None
+
     # Create trainval/test split
     df_test = df.iloc[split_info['test']['start_index']:
                       split_info['test']['end_index']+1]
 
     # Add features
     X_df_test, y_df_test = build_feature_dataframe(
-        df_test, target, lags=lags, rolls=rolls)
+        df_test, target, df_weather=df_weather, lags=lags, rolls=rolls)
 
     # Convert to numpy
     X_test = X_df_test.to_numpy(dtype='float32')
@@ -223,7 +232,15 @@ def predict_at(run_dir: Path, timestamp: datetime | None = None,):
                                       timestamp_format=config['data']['timestamp_format'],
                                       last_rows=None)
 
-    print(df_full)
+    # Read weather data
+    if config['data']['weather']['use']:
+        df_weather = read_dataframe_from_sql(db_path=config['data']['weather']['source'],
+                                             table_name=config['data']['weather']['table'],
+                                             column_names=config['data']['weather']['columns'],
+                                             timestamp_col=config['data']['weather']['timestamp_col'],
+                                             timestamp_format=config['data']['weather']['timestamp_format'], )
+    else:
+        df_weather = None
 
     if not isinstance(df_full.index, pd.DatetimeIndex):
         raise TypeError("DataFrame index must be a pandas.DatetimeIndex.")
@@ -250,7 +267,7 @@ def predict_at(run_dir: Path, timestamp: datetime | None = None,):
 
     # Add features
     X_df, _ = build_feature_dataframe(
-        df_past, target, lags=lags, rolls=rolls)
+        df_past, target, df_weather=df_weather, lags=lags, rolls=rolls)
 
     # Convert to numpy
     X = X_df.to_numpy(dtype='float32')

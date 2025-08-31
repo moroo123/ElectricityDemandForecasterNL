@@ -2,13 +2,13 @@ seed: 42
 data:
   target: NL_load_actual_entsoe_transparency
   freq_minutes: 15
-  lookback: 720
+  lookback: 96
   horizon: 96
 features:
   lags: [0, 1, 4, 12, 96]
-  rolls: [96, 288]
+  rolls: [96]
 cv:
-  n_splits: 4
+  n_splits: 2
 split:
   trainval_test_split: 0.8
   train_val_split: 0.9
@@ -22,7 +22,7 @@ train:
   epochs: 100
   patience: 10
   hpo:
-    n_trials: 2 
+    n_trials: 1 
     learning_rate:
       low: 0.0001
       high: 0.001

@@ -175,6 +175,15 @@ def main(db_path: str, table_name: str, db_path_weather: str | None = None, tabl
     best_cfg['data']['timestamp_col'] = timestamp_col
     best_cfg['data']['timestamp_format'] = timestamp_format
 
+    if table_name_weather != 'None':
+        best_cfg['data']['weather'] = {}
+        best_cfg['data']['weather']['use'] = True
+        best_cfg['data']['weather']['source'] = db_path_weather
+        best_cfg['data']['weather']['table'] = table_name_weather
+        best_cfg['data']['weather']['columns'] = column_names_weather
+        best_cfg['data']['weather']['timestamp_col'] = timestamp_col
+        best_cfg['data']['weather']['timestamp_format'] = timestamp_format
+
     best_cfg['split']['trainval_test_split'] = best_cfg['split']['trainval_test_split']
     best_cfg['split']['train_val_split'] = best_cfg['split']['train_val_split']
 
