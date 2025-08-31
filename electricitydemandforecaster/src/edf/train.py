@@ -59,10 +59,11 @@ def _fit_one(model: nn.Module, train_dataloader: DataLoader, val_dataloader: Dat
     # Training loop
     for epoch in tqdm(range(epochs), desc='Training epochs', leave=False):
         model.train()
-        for x, y in train_dataloader:
-            x, y = x.to(DEVICE), y.to(DEVICE)
+        for x_window, x_features, y in train_dataloader:
+            x_window, x_features, y = x_window.to(
+                DEVICE), x_features.to(DEVICE), y.to(DEVICE)
             optimizer.zero_grad()  # Remove gradient
-            y_pred = model(x)  # Predict
+            y_pred = model(x_window, x_features)  # Predict
             loss = criterion(y_pred, y.squeeze(-1))  # Calculate loss
             loss.backward()  # Backwards step
             nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
@@ -74,10 +75,11 @@ def _fit_one(model: nn.Module, train_dataloader: DataLoader, val_dataloader: Dat
         n_examples = 0
 
         with torch.no_grad():
-            for x, y in val_dataloader:
+            for x_window, x_features, y in val_dataloader:
 
-                x, y = x.to(DEVICE), y.to(DEVICE)
-                y_pred = model(x)
+                x_window, x_features, y = x_window.to(
+                    DEVICE), x_features.to(DEVICE), y.to(DEVICE)
+                y_pred = model(x_window, x_features)
 
                 # Move to CPU
                 y_pred_np = y_pred.detach().cpu().numpy()
@@ -101,7 +103,7 @@ def _fit_one(model: nn.Module, train_dataloader: DataLoader, val_dataloader: Dat
                 batch_mse = np.mean((y_pred_unscaled - y_true_unscaled) ** 2)
 
                 # Weight by batch size
-                bsz = x.size(0)
+                bsz = x_window.size(0)
                 val_loss += batch_mse * bsz
                 n_examples += bsz
 
@@ -163,10 +165,11 @@ def cross_validate(df: pd.DataFrame, model_name: str, target_column: str, df_wea
 
     set_seed(seed)
 
-    X_df, y_df = build_feature_dataframe(
+    X_window_df, X_feature_df, y_df = build_feature_dataframe(
         df, target_column, df_weather=df_weather, lags=lags, rolls=rolls)
 
-    X = X_df.to_numpy(dtype='float32')
+    X_window = X_window_df.to_numpy(dtype='float32')
+    X_features = X_feature_df.to_numpy(dtype='float32')
     y = y_df.to_numpy(dtype='float32')
 
     # Train/validation split
@@ -175,7 +178,7 @@ def cross_validate(df: pd.DataFrame, model_name: str, target_column: str, df_wea
     cv_splits = {'cv': {'n_splits': n_splits,
                         'folds': []}}
 
-    for fold, (train_idx, val_idx) in tqdm(enumerate(tscv.split(X)), total=n_splits, desc='Cross-validation folds', leave=False):
+    for fold, (train_idx, val_idx) in tqdm(enumerate(tscv.split(X_features)), total=n_splits, desc='Cross-validation folds', leave=False):
 
         cv_splits['cv']['folds'].append({
             'train_index_start': train_idx.tolist()[0],
@@ -184,29 +187,35 @@ def cross_validate(df: pd.DataFrame, model_name: str, target_column: str, df_wea
             'val_index_end': val_idx.tolist()[-1],
         })
 
-        X_train, X_val = X[train_idx], X[val_idx]
+        X_features_train, X_features_val = X_features[train_idx], X_features[val_idx]
+        X_window_train, X_window_val = X_window[train_idx], X_window[val_idx]
         y_train, y_val = y[train_idx], y[val_idx]
 
-        # Scaler X and y training and validation data
-        scaler_X, scaler_y = StandardScaler(), StandardScaler()
-        X_train = scaler_X.fit_transform(X_train)
-        X_val = scaler_X.transform(X_val)
+        # Scale
+        scaler_X_window = StandardScaler()
+        X_window_train = scaler_X_window.fit_transform(X_window_train)
+        X_window_val = scaler_X_window.transform(X_window_val)
+
+        scaler_X_feature = StandardScaler()
+        X_features_train = scaler_X_feature.fit_transform(X_features_train)
+        X_features_val = scaler_X_feature.transform(X_features_val)
+
+        scaler_y = StandardScaler()
         y_train = scaler_y.fit_transform(y_train.reshape(-1, 1))
         y_val = scaler_y.transform(y_val.reshape(-1, 1))
 
         # Create a dataset
         train_dataset = ElectricityDemandDataset(
-            X_train, y_train, lookback, horizon)
+            X_window_train, X_features_train, y_train, lookback, horizon)
         val_dataset = ElectricityDemandDataset(
-            X_val, y_val, lookback, horizon)
+            X_window_val, X_features_val, y_val, lookback, horizon)
 
         # Create dataloaders
         train_dataloader = DataLoader(train_dataset, batch_size, shuffle=False)
         val_dataloader = DataLoader(val_dataset, batch_size, shuffle=False)
 
-        input_size = X.shape[1]
         model = MODEL_REGISTRY[model_name](
-            input_size=input_size, **model_kwargs, output_size=horizon).to(DEVICE)
+            windows_input_size=X_window_train.shape[1], feature_input_size=X_features_train.shape[1], **model_kwargs, output_size=horizon).to(DEVICE)
         step_offset = fold * epochs
         score = _fit_one(model, train_dataloader, val_dataloader, scaler_y,
                          epochs, lr, weight_decay, patience, trial, step_offset)
@@ -243,38 +252,47 @@ def train_final(df: pd.DataFrame, model_name: str, target_column: str, df_weathe
     """
     set_seed(seed)
 
-    X_df, y_df = build_feature_dataframe(
+    X_window_df, X_features_df, y_df = build_feature_dataframe(
         df, target_column, df_weather=df_weather, lags=lags, rolls=rolls)
 
-    X = X_df.to_numpy(dtype='float32')
+    X_window = X_window_df.to_numpy(dtype='float32')
+    X_features = X_features_df.to_numpy(dtype='float32')
     y = y_df.to_numpy(dtype='float32')
 
-    idx_split = int(X.shape[0] * (train_val_split))
-    X_train, X_val = X[:idx_split], X[idx_split:]
+    idx_split = int(X_window.shape[0] * (train_val_split))
+    X_window_train, X_window_val = X_window[:idx_split], X_window[idx_split:]
+    X_features_train, X_features_val = X_features[:idx_split], X_features[idx_split:]
     y_train, y_val = y[:idx_split], y[idx_split:]
 
-    # Scaler X and y training and validation data
-    scaler_X, scaler_y = StandardScaler(), StandardScaler()
-    X_train = scaler_X.fit_transform(X_train)
+    # Scale
+    scaler_X_window = StandardScaler()
+    X_window_train = scaler_X_window.fit_transform(X_window_train)
+    X_window_val = scaler_X_window.transform(X_window_val)
+
+    scaler_X_feature = StandardScaler()
+    X_features_train = scaler_X_feature.fit_transform(X_features_train)
+    X_features_val = scaler_X_feature.transform(X_features_val)
+
+    scaler_y = StandardScaler()
     y_train = scaler_y.fit_transform(y_train.reshape(-1, 1))
-    X_val = scaler_X.transform(X_val)
     y_val = scaler_y.transform(y_val.reshape(-1, 1))
 
     # Create a dataset
     train_dataset = ElectricityDemandDataset(
-        X_train, y_train, lookback, horizon)
+        X_window_train, X_features_train, y_train, lookback, horizon)
     val_dataset = ElectricityDemandDataset(
-        X_val, y_val, lookback, horizon)
+        X_window_val, X_features_val, y_val, lookback, horizon)
 
     # Create dataloaders
     train_dataloader = DataLoader(train_dataset, batch_size, shuffle=False)
     val_dataloader = DataLoader(val_dataset, batch_size, shuffle=False)
 
-    input_size = X.shape[1]
+    windows_input_size = X_window_train.shape[1]
+    feature_input_size = X_features_train.shape[1]
     model = MODEL_REGISTRY[model_name](
-        input_size=input_size, **model_kwargs, output_size=horizon).to(DEVICE)
+        windows_input_size=windows_input_size, feature_input_size=feature_input_size, **model_kwargs, output_size=horizon).to(DEVICE)
 
     final_val_loss = _fit_one(model, train_dataloader, val_dataloader, scaler_y,
                               epochs, lr, weight_decay, patience)
 
-    return (model, scaler_X, scaler_y, input_size, final_val_loss)
+    return (model, scaler_X_window, scaler_X_feature, scaler_y, windows_input_size, feature_input_size, final_val_loss)

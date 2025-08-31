@@ -152,7 +152,7 @@ def main(db_path: str, table_name: str, db_path_weather: str | None = None, tabl
     model_kwargs = {k: v for k, v in best_cfg['model'].items() if k not in [
         'name']}
 
-    model, scaler_X, scaler_y, input_size, final_val_loss = train_final(
+    model, scaler_X_window, scaler_X_feature, scaler_y, windows_input_size, feature_input_size, final_val_loss = train_final(
         df_trainval, model_name, target, df_weather, lags, rolls, lookback,
         horizon, model_kwargs,
         batch_size=best_cfg['train']['batch_size'],
@@ -165,7 +165,8 @@ def main(db_path: str, table_name: str, db_path_weather: str | None = None, tabl
     )
 
     # Add input and output size to config
-    best_cfg['model']['input_size'] = input_size
+    best_cfg['model']['windows_input_size'] = windows_input_size
+    best_cfg['model']['feature_input_size'] = feature_input_size
     best_cfg['model']['output_size'] = best_cfg['data']['horizon']
 
     # Add data loading information to config
@@ -189,7 +190,9 @@ def main(db_path: str, table_name: str, db_path_weather: str | None = None, tabl
 
     # Save artifacts
     torch.save(model.state_dict(), os.path.join(run_dir, f'{model_name}.pt'))
-    joblib.dump(scaler_X, os.path.join(run_dir, 'scaler_X.pkl'))
+    joblib.dump(scaler_X_window, os.path.join(run_dir, 'scaler_X_window.pkl'))
+    joblib.dump(scaler_X_feature, os.path.join(
+        run_dir, 'scaler_X_features.pkl'))
     joblib.dump(scaler_y, os.path.join(run_dir, 'scaler_y.pkl'))
 
     # Save config of best model

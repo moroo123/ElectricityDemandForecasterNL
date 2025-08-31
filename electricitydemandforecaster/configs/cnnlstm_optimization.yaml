@@ -6,9 +6,11 @@ data:
   horizon: 96
 features:
   lags: [0, 1, 4, 12, 96]
-  rolls: [96]
+  rolls: [96, 288]
+  # lags: [0, 1, 4, 12, 96, 672]
+  # rolls: [96, 288, 672]
 cv:
-  n_splits: 2
+  n_splits: 4
 split:
   trainval_test_split: 0.8
   train_val_split: 0.9
@@ -22,7 +24,7 @@ train:
   epochs: 100
   patience: 10
   hpo:
-    n_trials: 1 
+    n_trials: 2 
     learning_rate:
       low: 0.0001
       high: 0.001
@@ -32,7 +34,7 @@ train:
       high: 1.0e-3
       log: true
     batch_size:
-      choices: [128, 256]
+      choices: [64, 128, 256]
     conv_channels:
       choices: [32, 64]
     num_conv_layers:
@@ -43,7 +45,7 @@ train:
       low: 0.1
       high: 0.3 
     hidden_size: 
-      choices: [256, 512]
+      choices: [128, 256, 512]
     num_layers: 
       choices: [2, 3]
     dropout: 

@@ -54,7 +54,8 @@ def load_artifact(run_dir: Path) -> Tuple[Dict, Dict, torch.nn.Module, StandardS
     run_dir = Path(run_dir)
     _require_file(run_dir / 'config.yaml')
     _require_file(run_dir / 'split_info.json')
-    _require_file(run_dir / 'scaler_X.pkl')
+    _require_file(run_dir / 'scaler_X_features.pkl')
+    _require_file(run_dir / 'scaler_X_window.pkl')
     _require_file(run_dir / 'scaler_y.pkl')
 
     with open(run_dir / 'config.yaml', 'r') as f:
@@ -63,7 +64,8 @@ def load_artifact(run_dir: Path) -> Tuple[Dict, Dict, torch.nn.Module, StandardS
     with open(run_dir / 'split_info.json', 'r') as f:
         split_info = json.load(f)
 
-    scaler_X = joblib.load(run_dir / 'scaler_X.pkl')
+    scaler_X_features = joblib.load(run_dir / 'scaler_X_features.pkl')
+    scaler_X_window = joblib.load(run_dir / 'scaler_X_window.pkl')
     scaler_y = joblib.load(run_dir / 'scaler_y.pkl')
 
     # Build model from config and load weights
@@ -76,7 +78,7 @@ def load_artifact(run_dir: Path) -> Tuple[Dict, Dict, torch.nn.Module, StandardS
     model.to(DEVICE)
     model.eval()
 
-    return config, split_info, model, scaler_X, scaler_y
+    return config, split_info, model, scaler_X_window, scaler_X_features, scaler_y
 
 
 def run_test(run_dir: Path, plot_horizons: list[int], save_plots: bool = True):
@@ -93,7 +95,8 @@ def run_test(run_dir: Path, plot_horizons: list[int], save_plots: bool = True):
 
     run_dir = Path(run_dir)
     # Load artifacts
-    config, split_info, model, scaler_X, scaler_y = load_artifact(run_dir)
+    config, split_info, model, scaler_X_window, scaler_X_features, scaler_y = load_artifact(
+        run_dir)
     horizon = config['data']['horizon']
     lookback = config['data']['lookback']
     batch_size = config['train']['batch_size']
@@ -125,20 +128,22 @@ def run_test(run_dir: Path, plot_horizons: list[int], save_plots: bool = True):
                       split_info['test']['end_index']+1]
 
     # Add features
-    X_df_test, y_df_test = build_feature_dataframe(
+    X_df_window_test, X_df_features_test, y_df_test = build_feature_dataframe(
         df_test, target, df_weather=df_weather, lags=lags, rolls=rolls)
 
     # Convert to numpy
-    X_test = X_df_test.to_numpy(dtype='float32')
+    X_window_test = X_df_window_test.to_numpy(dtype='float32')
+    X_features_test = X_df_features_test.to_numpy(dtype='float32')
     y_test = y_df_test.to_numpy(dtype='float32').reshape(-1, 1)
 
     # Scaler X and y training and validation data
-    X_test = scaler_X.transform(X_test)
+    X_window_test = scaler_X_window.transform(X_window_test)
+    X_features_test = scaler_X_features.transform(X_features_test)
     y_test = scaler_y.transform(y_test)
 
     # Create a dataset and dataloader
     test_dataset = ElectricityDemandDataset(
-        X_test, y_test, lookback, horizon)
+        X_window_test, X_features_test, y_test, lookback, horizon)
     test_dataloader = DataLoader(
         test_dataset, batch_size, shuffle=False)
 
@@ -146,9 +151,10 @@ def run_test(run_dir: Path, plot_horizons: list[int], save_plots: bool = True):
     predictions = []
     trues = []
     with torch.inference_mode():
-        for x, y in test_dataloader:
-            x, y = x.to(DEVICE), y.to(DEVICE)
-            y_pred = model(x)
+        for x_window, x_feature, y in test_dataloader:
+            x_window, x_feature, y = x_window.to(
+                DEVICE), x_feature.to(DEVICE), y.to(DEVICE)
+            y_pred = model(x_window, x_feature)
             predictions.extend(y_pred.detach().cpu().numpy())
             trues.extend(y.detach().cpu().numpy())
 
@@ -212,7 +218,8 @@ def predict_at(run_dir: Path, timestamp: datetime | None = None,):
 
     run_dir = Path(run_dir)
     # Load artifacts
-    config, split_info, model, scaler_X, scaler_y = load_artifact(run_dir)
+    config, split_info, model, scaler_X_window, scaler_X_features, scaler_y = load_artifact(
+        run_dir)
     horizon = config['data']['horizon']
     lookback = config['data']['lookback']
     batch_size = config['train']['batch_size']
@@ -266,23 +273,30 @@ def predict_at(run_dir: Path, timestamp: datetime | None = None,):
         )
 
     # Add features
-    X_df, _ = build_feature_dataframe(
+    X_window_df, X_feature_df, _ = build_feature_dataframe(
         df_past, target, df_weather=df_weather, lags=lags, rolls=rolls)
 
     # Convert to numpy
-    X = X_df.to_numpy(dtype='float32')
+    X_window = X_window_df.to_numpy(dtype='float32')
+    X_feature = X_feature_df.to_numpy(dtype='float32')
 
     # Scaler X and y training and validation data
-    X_scaled = scaler_X.transform(X)
+    X_window_scaled = scaler_X_window.transform(X_window)
+    X_feature_scaled = scaler_X_features.transform(X_feature)
 
     # Create sequences
-    X_seq = X_scaled[-lookback:]
+    X_window_seq = X_window_scaled[-lookback:]
+    X_feature_seq = X_feature_scaled[-1]
 
     # Convert to torch
-    X_tensor = torch.from_numpy(X_seq).float().unsqueeze(0).to(DEVICE)
+    X_window_tensor = torch.from_numpy(
+        X_window_seq).float().unsqueeze(0).to(DEVICE)
+    X_feature_tensor = torch.from_numpy(
+        X_feature_seq).float().unsqueeze(0).to(DEVICE)
 
     with torch.inference_mode():
-        y_pred = model(X_tensor).detach().cpu().numpy()[0]
+        y_pred = model(X_window_tensor,
+                       X_feature_tensor).detach().cpu().numpy()[0]
 
     y_pred_rescaled = scaler_y.inverse_transform(
         y_pred.reshape(1, -1)).reshape(-1)

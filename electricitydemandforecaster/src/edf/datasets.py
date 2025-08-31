@@ -9,7 +9,8 @@ class ElectricityDemandDataset(Dataset):
     """
 
     def __init__(self,
-                 X: np.array,
+                 X_window: np.array,
+                 X_features: np.array,
                  y: np.array,
                  lookback_length: int,
                  horizon_length: int,
@@ -25,10 +26,11 @@ class ElectricityDemandDataset(Dataset):
         self.lookback_length = lookback_length
         self.horizon_length = horizon_length
 
-        self.X = X
+        self.X_window = X_window
+        self.X_features = X_features
         self.y = y
 
-        self.num_timesteps, self.num_features = self.X.shape
+        self.num_timesteps, self.num_features = self.X_features.shape
 
         max_start = self.num_timesteps - lookback_length - horizon_length + 1
 
@@ -42,6 +44,9 @@ class ElectricityDemandDataset(Dataset):
         self.window_horizon = (
             start_lookback[:, None] + lookback_length + base_horizon[None, :])
 
+        # Index for feature
+        self.feature_indices = start_lookback + lookback_length - 1
+
     def __getitem__(self, idx):
         """Get a sample from the dataset.
 
@@ -51,10 +56,11 @@ class ElectricityDemandDataset(Dataset):
         Returns:
             tuple(torch.Tensor, torch.Tensor): A tuple containing the X tensor and target tensor.
         """
-        X = self.X[self.window_lookback[idx]]
+        X_window = self.X_window[self.window_lookback[idx]]
+        X_features = self.X_features[self.feature_indices[idx]]
         y = self.y[self.window_horizon[idx]]
 
-        return (torch.Tensor(X), torch.Tensor(y))
+        return (torch.Tensor(X_window), torch.Tensor(X_features), torch.Tensor(y))
 
     def __len__(self):
         """Get the number of samples in the dataset.

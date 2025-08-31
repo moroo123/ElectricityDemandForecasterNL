@@ -131,26 +131,33 @@ def build_feature_dataframe(df: pd.DataFrame, target_column: str, df_weather: pd
         tuple: A tuple containing the feature dataframe(X) and target dataframe(y).
     """
 
+    if df_weather is not None:
+        df_weather_aligned = align_weather_to_index(
+            df_weather, df.index, method='ffill')
+
+        X_window_df = pd.concat(
+            [df[[target_column]], df_weather_aligned], axis=1)
+    else:
+        X_window_df = df[[target_column]].copy()
+
     df_time_features = build_time_features(df)
     df_holiday_features = build_holiday_feature(df)
     df_lagroll_features = build_lagroll_features(
         df, target_column, lags, rolls)
 
-    if df_weather is not None:
-        df_weather = align_weather_to_index(
-            df_weather, df.index, method='ffill')
+    X_features_df = pd.concat(
+        [df_time_features, df_holiday_features, df_lagroll_features], axis=1)
 
-        X = pd.concat([df_time_features, df_holiday_features,
-                       df_lagroll_features, df_weather], axis=1)
-    else:
-        X = pd.concat([df_time_features, df_holiday_features,
-                       df_lagroll_features], axis=1)
+    X_window_df = df[[target_column]].copy()
 
-    y = df[[target_column]].copy()
+    y_df = df[[target_column]].copy()
 
-    combined = pd.concat([X, y], axis=1).dropna()
+    combined_for_alignment = pd.concat([X_features_df, y_df], axis=1).dropna()
 
-    X = combined.drop(columns=[target_column])
-    y = combined[[target_column]]
+    clean_index = combined_for_alignment.index
 
-    return X, y
+    X_features_df = X_features_df.loc[clean_index]
+    X_window_df = X_window_df.loc[clean_index]
+    y_df = y_df.loc[clean_index]
+
+    return X_window_df, X_features_df, y_df
