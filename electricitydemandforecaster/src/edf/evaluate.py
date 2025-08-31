@@ -223,6 +223,8 @@ def predict_at(run_dir: Path, timestamp: datetime | None = None,):
                                       timestamp_format=config['data']['timestamp_format'],
                                       last_rows=None)
 
+    print(df_full)
+
     if not isinstance(df_full.index, pd.DatetimeIndex):
         raise TypeError("DataFrame index must be a pandas.DatetimeIndex.")
 

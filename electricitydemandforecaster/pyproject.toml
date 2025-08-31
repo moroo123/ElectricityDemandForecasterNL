@@ -10,7 +10,7 @@ authors = [
   { name="Moritz C. Schmidt", email="moritzsch12395@gmail.com" }
 ]
 dependencies = [
-  "numpy", "pandas", "torch", "scikit-learn==1.6.1", "matplotlib", "pyyaml", "joblib", "holidays","ipykernel", "tqdm", "xgboost", "ipywidgets"
+  "numpy", "pandas", "torch", "scikit-learn==1.6.1", "matplotlib", "pyyaml", "joblib", "holidays","ipykernel", "tqdm", "xgboost", "ipywidgets", "optuna"
 ]
 
 [tool.setuptools]

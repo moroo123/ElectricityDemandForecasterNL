@@ -11,11 +11,12 @@ import copy
 import numpy as np
 import pandas as pd
 from tqdm.auto import tqdm
+import optuna
 
 DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
 
 
-def _fit_one(model: nn.Module, train_dataloader: DataLoader, val_dataloader: DataLoader, scaler_y: StandardScaler, epochs: int, lr: float, weight_decay: float = 0.0, patience: int = 10):
+def _fit_one(model: nn.Module, train_dataloader: DataLoader, val_dataloader: DataLoader, scaler_y: StandardScaler, epochs: int, lr: float, weight_decay: float = 0.0, patience: int = 10, trial: optuna.trial.Trial | None = None, step_offset: int | None = None):
     """Train the model for one fold.
 
     Args:
@@ -27,6 +28,8 @@ def _fit_one(model: nn.Module, train_dataloader: DataLoader, val_dataloader: Dat
         lr (float): The learning rate.
         weight_decay (float, optional): The weight decay. Defaults to 0.0.
         patience (int, optional): The number of epochs with no improvement after which training will be stopped. Defaults to 10.
+        trial (optuna trial, optional): Optuna trial object for hyperparameter optimization.
+        step_offset (int, optional): Step offset for the current fold. Defaults to None.
 
     Returns:
         float: The best validation loss.
@@ -107,6 +110,16 @@ def _fit_one(model: nn.Module, train_dataloader: DataLoader, val_dataloader: Dat
         # Step scheduler
         scheduler.step(val_loss)
 
+        if trial:
+            global_step = step_offset + epoch
+
+            # Report results to the pruner
+            trial.report(val_loss, global_step)
+
+            # Handle pruning
+            if trial.should_prune():
+                raise optuna.exceptions.TrialPruned()
+
         # Check for early stopping
         if val_loss < best_val_loss:
             best_val_loss = val_loss
@@ -123,7 +136,7 @@ def _fit_one(model: nn.Module, train_dataloader: DataLoader, val_dataloader: Dat
     return best_val_loss
 
 
-def cross_validate(df: pd.DataFrame, model_name: str, target_column: str, df_weather: pd.DataFrame | None,  lags: list[int], rolls: list[int], lookback: int, horizon: int, model_kwargs: dict, batch_size: int, n_splits: int, epochs: int, lr: float, weight_decay: float = 0.0, patience: int = 10, seed: int = 42):
+def cross_validate(df: pd.DataFrame, model_name: str, target_column: str, df_weather: pd.DataFrame | None,  lags: list[int], rolls: list[int], lookback: int, horizon: int, model_kwargs: dict, batch_size: int, n_splits: int, epochs: int, lr: float, weight_decay: float = 0.0, patience: int = 10, seed: int = 42, trial: optuna.trial.Trial | None = None):
     """Train the model using cross-validation.
 
     Args:
@@ -142,6 +155,7 @@ def cross_validate(df: pd.DataFrame, model_name: str, target_column: str, df_wea
         weight_decay (float, optional): The weight decay. Defaults to 0.0.
         patience (int, optional): The number of epochs with no improvement after which training will be stopped. Defaults to 10.
         seed (int, optional): The random seed. Defaults to 42.
+        trial (Optuna trial, optional): Optuna trial for hyperparameter optimization
 
     Returns:
         tuple: A tuple containing the mean cross-validation loss, the standard deviation of the cross-validation loss, and the cross-validation splits.
@@ -193,9 +207,9 @@ def cross_validate(df: pd.DataFrame, model_name: str, target_column: str, df_wea
         input_size = X.shape[1]
         model = MODEL_REGISTRY[model_name](
             input_size=input_size, **model_kwargs, output_size=horizon).to(DEVICE)
-
+        step_offset = fold * epochs
         score = _fit_one(model, train_dataloader, val_dataloader, scaler_y,
-                         epochs, lr, weight_decay, patience)
+                         epochs, lr, weight_decay, patience, trial, step_offset)
 
         fold_losses.append(score)
 
