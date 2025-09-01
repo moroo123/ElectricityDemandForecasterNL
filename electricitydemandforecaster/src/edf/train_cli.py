@@ -68,7 +68,7 @@ def objective(trial: optuna.trial.Trial, config: dict, df_trainval: pd.DataFrame
     return mean_cv
 
 
-def main(db_path: str, table_name: str, db_path_weather: str | None = None, table_name_weather: str | None = None, config_path: str = 'configs', runs_root: str = 'runs', run_optimization: bool = True, fraction: int = 1):
+def main(db_path: str, table_name: str, db_path_weather: str | None = None, table_name_weather: str | None = None, config_path: str = 'configs', runs_root: str = 'runs', run_optimization: bool = True, fraction: int = 1, resume_from: str | None = None):
     """Train the model using the specified configuration.
     """
 
@@ -81,8 +81,14 @@ def main(db_path: str, table_name: str, db_path_weather: str | None = None, tabl
 
     df = df.iloc[:(len(df)//fraction)]
 
-    # Create run directory
-    run_dir = make_run_dir(runs_root)
+    if resume_from:
+        run_dir = Path(resume_from)
+        if not run_dir.exists():
+            raise FileNotFoundError(
+                f"Run directory to resume from does not exist: {resume_from}")
+        print(f"Resuming run from: {run_dir}")
+    else:
+        run_dir = make_run_dir(runs_root)
 
     if table_name_weather != 'None':
         column_names_weather = [
@@ -107,7 +113,7 @@ def main(db_path: str, table_name: str, db_path_weather: str | None = None, tabl
     ratio = config['split']['trainval_test_split']
     split_idx = int(len(df) * ratio)
     df_trainval, df_test = df.iloc[:split_idx], df.iloc[split_idx:]
-    print(config['train']['hpo']['n_trials'])
+
     if run_optimization:
         pruner = optuna.pruners.HyperbandPruner()
 
@@ -115,7 +121,8 @@ def main(db_path: str, table_name: str, db_path_weather: str | None = None, tabl
             storage=f'sqlite:///{run_dir}/optuna_optimization.db',
             study_name='hyperparameter_optimization',
             direction="minimize",
-            pruner=pruner)
+            pruner=pruner,
+            load_if_exists=True)
         study.optimize(
             lambda trial: objective(trial, config, df_trainval, df_weather),
             n_trials=config['train']['hpo']['n_trials']
@@ -234,6 +241,8 @@ if __name__ == '__main__':
                         default='True', help='Whether to perform hyperparameter optimization')
     parser.add_argument('--fraction', type=int,
                         default=1, help='Divide complete data size by fraction')
+    parser.add_argument('--resume-from', type=str,
+                        default=None, help='Path to a previous run directory to resume optimization.')
     args = parser.parse_args()
 
     main(db_path=args.db_path,
@@ -243,7 +252,8 @@ if __name__ == '__main__':
          config_path=args.config,
          runs_root=args.runs_root,
          run_optimization=args.run_optimization.lower() in ('true', '1', 'yes'),
-         fraction=args.fraction)
+         fraction=args.fraction,
+         resume_from=args.resume_from)
 
     sys.exit(0)
 
