@@ -12,49 +12,39 @@ features:
   - 12
   - 96
   - 672
-  # - 2880
   rolls:
   - 96
   - 288 
   - 672 
-  # - 2016
-  # - 2880
 model:
   name: CnnLSTM
   # CNN properties
   conv_channels:
-  - 32
+  - 64
   num_conv_layers:
   - 3
   kernel_size:
-  - 3
+  - 5
   dilation_base:
   - 2
   conv_dropout:
-  - 0.2
+  - 0.24507
   use_batchnorm:
   - true
   # LSTM properties 
   hidden_size: 
-  - 256
+  - 128
   num_layers: 
-  # - 2
-  - 3
+  - 2
   dropout: 
-  # - 0.2
-  - 0.3
-  # - 0.4
+  - 0.21962
 train:
   batch_size: 
-  # - 128
-  - 256
+  - 64
   learning_rate: 
-  # - 0.001
-  - 0.0005
-  # - 0.0001
+  - 0.00073
   weight_decay: 
-  # - 0.0001
-  - 0
+  - 0.00045
   epochs: 
   - 100
   patience: 

@@ -149,6 +149,7 @@ def main(db_path: str, table_name: str, db_path_weather: str | None = None, tabl
     best_cfg['model']['num_conv_layers'] = best_params.get('num_conv_layers')
     best_cfg['model']['kernel_size'] = best_params.get('kernel_size')
     best_cfg['model']['conv_dropout'] = best_params.get('conv_dropout')
+    best_cfg['model']['dropout'] = best_params.get('dropout')
     best_cfg['train'].pop('hpo', None)
 
     target = best_cfg['data']['target']
