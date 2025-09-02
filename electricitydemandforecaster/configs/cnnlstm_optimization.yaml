@@ -8,7 +8,7 @@ features:
   lags: [0, 1, 4, 12, 96, 672]
   rolls: [96, 288, 672]
 cv:
-  n_splits: 3
+  n_splits: 4
 split:
   trainval_test_split: 0.8
   train_val_split: 0.9

@@ -263,9 +263,6 @@ def cross_validate(df: pd.DataFrame, model_name: str, target_column: str, df_wea
 
         X_features_train, X_features_val = X_features[train_idx], X_features[val_idx]
 
-        print(fold, X_features_train.shape)
-        print(fold, X_features_val.shape)
-
         X_window_train, X_window_val = X_window[train_idx], X_window[val_idx]
         y_train, y_val = y[train_idx], y[val_idx]
 
