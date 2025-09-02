@@ -166,7 +166,10 @@ def cross_validate(df: pd.DataFrame, model_name: str, target_column: str, df_wea
     set_seed(seed)
 
     X_window_df, X_feature_df, y_df = build_feature_dataframe(
-        df, target_column, df_weather=df_weather, lags=lags, rolls=rolls)
+        df, target_column, df_weather=df_weather, lags=lags, rolls=rolls, horizon=horizon)
+
+    print(X_window_df)
+    print(X_feature_df)
 
     X_window = X_window_df.to_numpy(dtype='float32')
     X_features = X_feature_df.to_numpy(dtype='float32')
@@ -253,7 +256,7 @@ def train_final(df: pd.DataFrame, model_name: str, target_column: str, df_weathe
     set_seed(seed)
 
     X_window_df, X_features_df, y_df = build_feature_dataframe(
-        df, target_column, df_weather=df_weather, lags=lags, rolls=rolls)
+        df, target_column, df_weather=df_weather, lags=lags, rolls=rolls, horizon=horizon)
 
     X_window = X_window_df.to_numpy(dtype='float32')
     X_features = X_features_df.to_numpy(dtype='float32')

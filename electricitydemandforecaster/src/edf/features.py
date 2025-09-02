@@ -119,17 +119,26 @@ def align_weather_to_index(df_weather: pd.DataFrame, index: pd.DatetimeIndex, me
     return df_weather_aligned
 
 
-def build_feature_dataframe(df: pd.DataFrame, target_column: str, df_weather: pd.DataFrame | None = None,  lags: list[int] | None = None, rolls: list[int] | None = None):
+def build_feature_dataframe(df: pd.DataFrame, target_column: str, df_weather: pd.DataFrame | None = None,  lags: list[int] | None = None, rolls: list[int] | None = None, horizon: int | None = None):
     """Build feature and target dataframes from the input dataframe.
 
     Args:
         df(pd.DataFrame): Input dataframe containing the features and target.
         target_column(str): Name of the target column.
+        df_weather(pd.DataFrame | None): Weather data.
         lags(list[int] | None): List of lag periods.
         rolls(list[int] | None): List of rolling window sizes.
+        horizon(int | None): Forecast horizon, required if using weather forecasts.
     Returns:
         tuple: A tuple containing the feature dataframe(X) and target dataframe(y).
     """
+
+    df_time_features = build_time_features(df)
+    df_holiday_features = build_holiday_feature(df)
+    df_lagroll_features = build_lagroll_features(
+        df, target_column, lags, rolls)
+
+    feature_dfs = [df_time_features, df_holiday_features, df_lagroll_features]
 
     if df_weather is not None:
         df_weather_aligned = align_weather_to_index(
@@ -137,22 +146,27 @@ def build_feature_dataframe(df: pd.DataFrame, target_column: str, df_weather: pd
 
         X_window_df = pd.concat(
             [df[[target_column]], df_weather_aligned], axis=1)
+
+        if horizon is None:
+            raise ValueError(
+                "`horizon` must be provided to create weather forecast features.")
+        future_weather_dfs = []
+        for h in range(1, horizon + 1):
+            shifted = df_weather_aligned.shift(-h)
+            shifted.columns = [
+                f"{col}_f{h}" for col in df_weather_aligned.columns]
+            future_weather_dfs.append(shifted)
+        df_weather_forecasts = pd.concat(future_weather_dfs, axis=1)
+        feature_dfs.append(df_weather_forecasts)
     else:
         X_window_df = df[[target_column]].copy()
 
-    df_time_features = build_time_features(df)
-    df_holiday_features = build_holiday_feature(df)
-    df_lagroll_features = build_lagroll_features(
-        df, target_column, lags, rolls)
-
-    X_features_df = pd.concat(
-        [df_time_features, df_holiday_features, df_lagroll_features], axis=1)
-
-    X_window_df = df[[target_column]].copy()
+    X_features_df = pd.concat(feature_dfs, axis=1)
 
     y_df = df[[target_column]].copy()
 
-    combined_for_alignment = pd.concat([X_features_df, y_df], axis=1).dropna()
+    combined_for_alignment = pd.concat(
+        [X_window_df, X_features_df, y_df], axis=1).dropna()
 
     clean_index = combined_for_alignment.index
 

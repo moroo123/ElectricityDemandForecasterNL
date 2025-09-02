@@ -129,7 +129,7 @@ def run_test(run_dir: Path, plot_horizons: list[int], save_plots: bool = True):
 
     # Add features
     X_df_window_test, X_df_features_test, y_df_test = build_feature_dataframe(
-        df_test, target, df_weather=df_weather, lags=lags, rolls=rolls)
+        df_test, target, df_weather=df_weather, lags=lags, rolls=rolls, horizon=horizon)
 
     # Convert to numpy
     X_window_test = X_df_window_test.to_numpy(dtype='float32')
@@ -274,7 +274,7 @@ def predict_at(run_dir: Path, timestamp: datetime | None = None,):
 
     # Add features
     X_window_df, X_feature_df, _ = build_feature_dataframe(
-        df_past, target, df_weather=df_weather, lags=lags, rolls=rolls)
+        df_past, target, df_weather=df_weather, lags=lags, rolls=rolls, horizon=horizon)
 
     # Convert to numpy
     X_window = X_window_df.to_numpy(dtype='float32')
