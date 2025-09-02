@@ -15,30 +15,13 @@ split:
 
 model:
   name: CnnLSTM
-  # CNN parameters
-  cnn_dilation_base: 2
-  cnn_use_batchnorm: true
-  cnn_conv_channels:
-    choices: [32, 64]
-  cnn_num_conv_layers:
-    choices: [2, 3]
-  cnn_kernel_size:
-    choices: [3, 5]
-  cnn_conv_dropout:
-    low: 0.1
-    high: 0.3 
-  # LSTM parameters
-  lstm_hidden_size: 
-    choices: [256, 512]
-  lstm_num_layers: 
-    choices: [2, 3]
-  lstm_dropout: 
-    low: 0.2
-    high: 0.4
+  # These parameters are fixed for all trials
+  dilation_base: 2
+  use_batchnorm: true
 train:
   epochs: 100
   patience: 10
-  hpo_trials: 1 
+  n_trials: 1 
   learning_rate:
     low: 0.0001
     high: 0.001
@@ -49,3 +32,19 @@ train:
     log: true
   batch_size:
     choices: [128, 256]
+  conv_channels:
+    choices: [32, 64]
+  num_conv_layers:
+    choices: [2, 3]
+  kernel_size:
+    choices: [3, 5]
+  conv_dropout:
+    low: 0.1
+    high: 0.3 
+  hidden_size: 
+    choices: [256, 512]
+  num_layers: 
+    choices: [2, 3]
+  dropout: 
+    low: 0.2
+    high: 0.4
