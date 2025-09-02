@@ -17,32 +17,36 @@ from pathlib import Path
 
 def objective(trial: optuna.trial.Trial, config: dict, df_trainval: pd.DataFrame, df_weather: pd.DataFrame | None):
 
-    hpo_params = config['train']['hpo']
+    training_params = config['train']
+    model_params = config['model']
 
     # Suggest values for hyperparameters
-    lr = trial.suggest_float("learning_rate", **hpo_params['learning_rate'])
+    lr = trial.suggest_float(
+        "learning_rate", **training_params['learning_rate'])
     weight_decay = trial.suggest_float(
-        "weight_decay", **hpo_params['weight_decay'])
+        "weight_decay", **training_params['weight_decay'])
     batch_size = trial.suggest_categorical(
-        "batch_size", **hpo_params['batch_size'])
+        "batch_size", **training_params['batch_size'])
 
     model_kwargs = {k: v for k, v in config['model'].items() if k not in [
         'name']}
 
-    model_kwargs['hidden_size'] = trial.suggest_categorical(
-        "hidden_size", **hpo_params['hidden_size'])
-    model_kwargs['num_layers'] = trial.suggest_categorical(
-        "num_layers", **hpo_params['num_layers'])
-    model_kwargs['conv_channels'] = trial.suggest_categorical(
-        'conv_channels', **hpo_params['conv_channels'])
-    model_kwargs['num_conv_layers'] = trial.suggest_categorical(
-        'num_conv_layers', **hpo_params['num_conv_layers'])
-    model_kwargs['conv_dropout'] = trial.suggest_float(
-        'conv_dropout', **hpo_params['conv_dropout'])
-    model_kwargs['dropout'] = trial.suggest_float(
-        'dropout', **hpo_params['dropout'])
-    model_kwargs['kernel_size'] = trial.suggest_categorical(
-        'kernel_size', **hpo_params['kernel_size'])
+    model_kwargs['lstm_hidden_size'] = trial.suggest_categorical(
+        "lstm_hidden_size", **model_params['lstm_hidden_size'])
+    model_kwargs['lstm_num_layers'] = trial.suggest_categorical(
+        "lstm_num_layers", **model_params['lstm_num_layers'])
+    model_kwargs['lstm_dropout'] = trial.suggest_float(
+        'lstm_dropout', **model_params['lstm_dropout'])
+    model_kwargs['cnn_conv_channels'] = trial.suggest_categorical(
+        'cnn_conv_channels', **model_params['cnn_conv_channels'])
+    model_kwargs['cnn_num_conv_layers'] = trial.suggest_categorical(
+        'cnn_num_conv_layers', **model_params['cnn_num_conv_layers'])
+    model_kwargs['cnn_kernel_size'] = trial.suggest_categorical(
+        'cnn_kernel_size', **model_params['cnn_kernel_size'])
+    model_kwargs['cnn_conv_dropout'] = trial.suggest_float(
+        'cnn_conv_dropout', **model_params['cnn_conv_dropout'])
+    model_kwargs['cnn_kernel_size'] = trial.suggest_categorical(
+        'cnn_kernel_size', **model_params['cnn_kernel_size'])
 
     # Unpack parameters from config
     target = config['data']['target']
@@ -125,7 +129,7 @@ def main(db_path: str, table_name: str, db_path_weather: str | None = None, tabl
             load_if_exists=True)
         study.optimize(
             lambda trial: objective(trial, config, df_trainval, df_weather),
-            n_trials=config['train']['hpo']['n_trials']
+            n_trials=config['train']['n_trials']
         )
 
         print(f"Best trial finished with value: {study.best_value}")
@@ -133,24 +137,21 @@ def main(db_path: str, table_name: str, db_path_weather: str | None = None, tabl
         best_params = study.best_params
     else:
         print("Skipping hyperparameter optimization, using default parameters from config.")
-        best_params['learning_rate'] = config['train']['hpo']['learning_rate']['low']
-        best_params['weight_decay'] = config['train']['hpo']['weight_decay']['low']
-        best_params['batch_size'] = config['train']['hpo']['batch_size']['choices'][0]
-        best_params['hidden_size'] = config['model']['hidden_size']
-        best_params['num_layers'] = config['model']['num_layers']
+        best_params = {**config['train'], **config['model']}
 
     best_cfg = config.copy()
     best_cfg['train']['learning_rate'] = best_params.get('learning_rate')
     best_cfg['train']['weight_decay'] = best_params.get('weight_decay')
     best_cfg['train']['batch_size'] = best_params.get('batch_size')
-    best_cfg['model']['hidden_size'] = best_params.get('hidden_size')
-    best_cfg['model']['num_layers'] = best_params.get('num_layers')
-    best_cfg['model']['conv_channels'] = best_params.get('conv_channels')
-    best_cfg['model']['num_conv_layers'] = best_params.get('num_conv_layers')
-    best_cfg['model']['kernel_size'] = best_params.get('kernel_size')
-    best_cfg['model']['conv_dropout'] = best_params.get('conv_dropout')
-    best_cfg['model']['dropout'] = best_params.get('dropout')
-    best_cfg['train'].pop('hpo', None)
+    best_cfg['model']['lstm_hidden_size'] = best_params.get('lstm_hidden_size')
+    best_cfg['model']['lstm_num_layers'] = best_params.get('lstm_num_layers')
+    best_cfg['model']['cnn_conv_channels'] = best_params.get(
+        'cnn_conv_channels')
+    best_cfg['model']['cnn_num_conv_layers'] = best_params.get(
+        'cnn_num_conv_layers')
+    best_cfg['model']['cnn_kernel_size'] = best_params.get('cnn_kernel_size')
+    best_cfg['model']['cnn_conv_dropout'] = best_params.get('cnn_conv_dropout')
+    best_cfg['model']['lstm_dropout'] = best_params.get('lstm_dropout')
 
     target = best_cfg['data']['target']
     lookback = best_cfg['data']['lookback']
