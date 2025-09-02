@@ -137,7 +137,6 @@ def build_feature_dataframe(df: pd.DataFrame, target_column: str, df_weather: pd
     df_holiday_features = build_holiday_feature(df)
     df_lagroll_features = build_lagroll_features(
         df, target_column, lags, rolls)
-
     feature_dfs = [df_time_features, df_holiday_features, df_lagroll_features]
 
     if df_weather is not None:

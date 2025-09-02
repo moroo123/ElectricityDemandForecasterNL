@@ -16,6 +16,77 @@ import optuna
 DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
 
 
+def _check_data_for_cv(df_len: int, lags: list[int], rolls: list[int], lookback: int, horizon: int, n_splits: int):
+    """Checks if there is enough data for cross-validation."""
+    max_lag = max(lags) if lags else 0
+    max_roll = max(rolls) if rolls else 0
+    feature_history_needed = max(max_lag, max_roll)
+
+    # After feature creation, we have (df_len - feature_history_needed) rows.
+    n_feature_rows = df_len - feature_history_needed
+    if n_feature_rows <= 0:
+        raise ValueError(
+            f"Not enough data to create any features. Need at least {feature_history_needed + 1} data points, but got {df_len}."
+        )
+
+    # TimeSeriesSplit splits the data. The first training fold is the smallest.
+    # It will have n_feature_rows // (n_splits + 1) samples.
+    first_fold_train_size = n_feature_rows // (n_splits + 1)
+
+    # This fold must be large enough to create at least one sample for the model.
+    min_rows_for_dataset = lookback + horizon
+    if first_fold_train_size < min_rows_for_dataset:
+        # Calculate minimum total feature rows needed
+        min_feature_rows_needed = min_rows_for_dataset * (n_splits + 1)
+        # Calculate minimum raw data points needed
+        min_raw_data_points = min_feature_rows_needed + feature_history_needed
+        raise ValueError(
+            f"Insufficient data for cross-validation with n_splits={n_splits}. "
+            f"The first training fold has only {first_fold_train_size} samples, but at least {min_rows_for_dataset} are required to create one lookback/horizon window. "
+            f"A total of {min_raw_data_points} data points are needed, but only {df_len} are available for training/validation. "
+            f"Breakdown: feature history={feature_history_needed}, lookback={lookback}, horizon={horizon}, n_splits={n_splits}."
+        )
+
+
+def _check_data_for_final_train(df_len: int, lags: list[int], rolls: list[int], lookback: int, horizon: int, train_val_split: float):
+    """Checks if there is enough data for final training and validation."""
+    max_lag = max(lags) if lags else 0
+    max_roll = max(rolls) if rolls else 0
+    feature_history_needed = max(max_lag, max_roll)
+
+    n_feature_rows = df_len - feature_history_needed
+    if n_feature_rows <= 0:
+        raise ValueError(
+            f"Not enough data to create any features. Need at least {feature_history_needed + 1} data points, but got {df_len}."
+        )
+
+    min_rows_for_dataset = lookback + horizon
+
+    # Check training set size
+    train_size = int(n_feature_rows * train_val_split)
+    if train_size < min_rows_for_dataset:
+        min_feature_rows_needed = int(
+            np.ceil(min_rows_for_dataset / train_val_split))
+        min_raw_data_points = min_feature_rows_needed + feature_history_needed
+        raise ValueError(
+            f"Insufficient data for training set with train_val_split={train_val_split}. "
+            f"Training set has {train_size} samples, but at least {min_rows_for_dataset} are required to create one lookback/horizon window. "
+            f"Need at least {min_raw_data_points} total data points for training/validation. Provided: {df_len}."
+        )
+
+    # Check validation set size
+    val_size = n_feature_rows - train_size
+    if val_size < min_rows_for_dataset:
+        min_feature_rows_needed = int(
+            np.ceil(min_rows_for_dataset / (1 - train_val_split)))
+        min_raw_data_points = min_feature_rows_needed + feature_history_needed
+        raise ValueError(
+            f"Insufficient data for validation set with train_val_split={train_val_split}. "
+            f"Validation set has {val_size} samples, but at least {min_rows_for_dataset} are required to create one lookback/horizon window. "
+            f"Need at least {min_raw_data_points} total data points for training/validation. Provided: {df_len}."
+        )
+
+
 def _fit_one(model: nn.Module, train_dataloader: DataLoader, val_dataloader: DataLoader, scaler_y: StandardScaler, epochs: int, lr: float, weight_decay: float = 0.0, patience: int = 10, trial: optuna.trial.Trial | None = None, step_offset: int | None = None):
     """Train the model for one fold.
 
@@ -165,6 +236,9 @@ def cross_validate(df: pd.DataFrame, model_name: str, target_column: str, df_wea
 
     set_seed(seed)
 
+    _check_data_for_cv(len(df), lags, rolls, lookback,
+                       horizon, n_splits)
+
     X_window_df, X_feature_df, y_df = build_feature_dataframe(
         df, target_column, df_weather=df_weather, lags=lags, rolls=rolls, horizon=horizon)
 
@@ -188,6 +262,10 @@ def cross_validate(df: pd.DataFrame, model_name: str, target_column: str, df_wea
         })
 
         X_features_train, X_features_val = X_features[train_idx], X_features[val_idx]
+
+        print(fold, X_features_train.shape)
+        print(fold, X_features_val.shape)
+
         X_window_train, X_window_val = X_window[train_idx], X_window[val_idx]
         y_train, y_val = y[train_idx], y[val_idx]
 
@@ -251,6 +329,9 @@ def train_final(df: pd.DataFrame, model_name: str, target_column: str, df_weathe
         tuple: A tuple containing the trained model, the scaler for X, and the scaler for y.
     """
     set_seed(seed)
+
+    _check_data_for_final_train(
+        len(df), lags, rolls, lookback, horizon, train_val_split)
 
     X_window_df, X_features_df, y_df = build_feature_dataframe(
         df, target_column, df_weather=df_weather, lags=lags, rolls=rolls, horizon=horizon)
