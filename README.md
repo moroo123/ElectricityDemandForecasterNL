@@ -41,7 +41,7 @@ run_test('path/to/run', plot_horizons=[1, 96], save_plots=True)
 ## Model Performance Comparison
 In `notebooks/1_training_and_eval`, we benchmark models:
 
-| Model       | MSE  |
+| Model       | MAE  |
 |-------------|------|
 | XGBoost     | 496  |
 | LSTM        | 544  |

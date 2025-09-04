@@ -2,7 +2,7 @@ seed: 42
 data:
   target: NL_load_actual_entsoe_transparency
   freq_minutes: 15
-  lookback: 96
+  lookback: 1440
   horizon: 96
 features:
   lags: [0, 1, 4, 12, 96, 672]
@@ -18,18 +18,19 @@ model:
   # These parameters are fixed for all trials
   cnn_dilation_base: 2
   cnn_use_batchnorm: true
-  cnn_conv_channels: 64
+  cnn_conv_channels: 32
   cnn_num_conv_layers: 2 
-  cnn_kernel_size: 3
-  cnn_conv_dropout: 0.1
-  lstm_hidden_size: 128
+  cnn_kernel_size: 5
+  cnn_conv_dropout: 0.228
+  lstm_hidden_size: 256
   lstm_num_layers:  2
-  lstm_dropout:  0.2
+  lstm_dropout:  0.374
 train:
-  epochs: 1
+  epochs: 100
   patience: 10
   n_trials: 2 
-  learning_rate: 0.0001
-  weight_decay: 1.0e-5
-  batch_size: 64
+  learning_rate: 0.00079
+  weight_decay: 1.955e-05
+  batch_size: 256 # Optimized value was 64 but training takes too long
+
   
