@@ -19,18 +19,17 @@ model:
   cnn_dilation_base: 2
   cnn_use_batchnorm: true
   cnn_conv_channels: 32
-  cnn_num_conv_layers: 2 
-  cnn_kernel_size: 5
-  cnn_conv_dropout: 0.228
+  cnn_num_conv_layers: 3
+  cnn_kernel_size: 3
+  cnn_conv_dropout: 0.20096200307649678
   lstm_hidden_size: 256
   lstm_num_layers:  2
-  lstm_dropout:  0.374
+  lstm_dropout:  0.27944775205529054
 train:
-  epochs: 100
+  epochs: 99
   patience: 10
-  n_trials: 2 
-  learning_rate: 0.00079
-  weight_decay: 1.955e-05
-  batch_size: 256 # Optimized value was 64 but training takes too long
+  n_trials: 100
+  learning_rate: 0.0005556436019751606
+  weight_decay: 0.000566556467567383
+  batch_size: 128 
 
-  

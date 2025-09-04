@@ -16,6 +16,7 @@ from typing import Dict, Tuple
 from sklearn.preprocessing import StandardScaler
 import pandas as pd
 from datetime import datetime
+import inspect
 
 DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
 
@@ -71,7 +72,12 @@ def load_artifact(run_dir: Path) -> Tuple[Dict, Dict, torch.nn.Module, StandardS
     # Build model from config and load weights
     model_config = config['model']
     model_cls = MODEL_REGISTRY[model_config['name']]
-    model = model_cls(**{k: v for k, v in model_config.items() if k != 'name'})
+
+    sig = inspect.signature(model_cls.__init__)
+    valid_params = {k: v for k, v in model_config.items()
+                    if k in sig.parameters}
+
+    model = model_cls(**valid_params)
     state_dict = torch.load(
         run_dir / (model_config['name'] + '.pt'), map_location='cpu')
     model.load_state_dict(state_dict)
@@ -202,8 +208,8 @@ def _feature_history(lags, rolls) -> int:
     - rolls: list[int] of rolling window sizes
     """
     max_lag = max(lags) if lags else 0
-    max_roll_need = (max(rolls) - 1) if rolls else 0
-    return max(max_lag, max_roll_need)
+    max_roll = max(rolls) if rolls else 0
+    return max(max_lag, max_roll)
 
 
 def predict_at(run_dir: Path, timestamp: datetime | None = None,):
@@ -229,7 +235,7 @@ def predict_at(run_dir: Path, timestamp: datetime | None = None,):
     freq_min = config['data']['freq_minutes']
 
     # Load the necessary rows from the database
-    rows_needed = _feature_history(lags, rolls) + lookback
+    feature_history_needed = _feature_history(lags, rolls)
 
     # Load the data
     df_full = read_dataframe_from_sql(db_path=config['data']['source'],
@@ -264,18 +270,32 @@ def predict_at(run_dir: Path, timestamp: datetime | None = None,):
             raise ValueError(f"No index near {timestamp!r}.")
 
     # Slice minimal past window; ensure we have enough rows
-    start_pos = max(0, pos - rows_needed + 1)  # inclusive start
+    # We need to fetch enough rows to compensate for rows dropped during feature engineering.
+    # build_feature_dataframe drops `feature_history_needed` from the start (lags/rolls)
+    # and `horizon` from the end (future targets/features).
+    # To get `lookback` rows for prediction, we need to fetch more.
+    rows_to_fetch = feature_history_needed + lookback + horizon
+    start_pos = max(0, pos - rows_to_fetch + 1)  # inclusive start
     df_past = df_full.iloc[start_pos: pos + 1]
-    if len(df_past) < rows_needed:
+    if len(df_past) < rows_to_fetch:
         raise ValueError(
-            f"Not enough rows up to {df_full.index[pos]}: have {len(df_past)}, need {rows_needed} "
-            f"(lookback={lookback}, feature_history={rows_needed - lookback})."
+            f"Not enough rows up to {df_full.index[pos]}: have {len(df_past)}, need {rows_to_fetch} "
+            f"(feature history={feature_history_needed}, lookback={lookback}, horizon={horizon})."
         )
 
     # Add features
     X_window_df, X_feature_df, _ = build_feature_dataframe(
         df_past, target, df_weather=df_weather, lags=lags, rolls=rolls, horizon=horizon)
 
+    # Ensure that feature dataframes are not empty after feature engineering.
+    # This can happen if df_past is too short or contains too many NaNs
+    # that lead to all rows being dropped during feature creation.
+    if X_window_df.empty or X_feature_df.empty:
+        raise ValueError(
+            f"No valid feature rows could be generated from the historical data. "
+            f"This might be due to insufficient data length after accounting for feature history ({feature_history_needed}), "
+            f"lookback ({lookback}), or due to missing values (NaNs) in the input data (`df_past`)."
+        )
     # Convert to numpy
     X_window = X_window_df.to_numpy(dtype='float32')
     X_feature = X_feature_df.to_numpy(dtype='float32')

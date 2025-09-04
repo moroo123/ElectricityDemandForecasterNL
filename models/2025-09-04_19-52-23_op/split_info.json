@@ -1,0 +1,10 @@
+{
+  "trainval": {
+    "start_index": 0,
+    "end_index": 161277
+  },
+  "test": {
+    "start_index": 161278,
+    "end_index": 201597
+  }
+}

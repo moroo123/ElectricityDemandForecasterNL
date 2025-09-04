@@ -59,6 +59,7 @@ class ElectricityDemandDataset(Dataset):
         X_window = self.X_window[self.window_lookback[idx]]
         X_features = self.X_features[self.feature_indices[idx]]
         y = self.y[self.window_horizon[idx]]
+        y = y.squeeze(-1) if y.ndim > 1 else y
 
         return (torch.Tensor(X_window), torch.Tensor(X_features), torch.Tensor(y))
 

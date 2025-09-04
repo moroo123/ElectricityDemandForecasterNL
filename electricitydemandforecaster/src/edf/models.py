@@ -103,20 +103,20 @@ class CnnLSTM(nn.Module):
         self.conv_kernel_dilations = conv_kernel_dilations
 
         # Define LSTM
-        lstm_input_size = cnn_conv_channels if len(
-            self.conv_layers) > 0 else self.windows_input_size
+        cnn_output_channels = cnn_conv_channels if cnn_num_conv_layers > 0 else self.windows_input_size
+        lstm_input_size = cnn_output_channels + self.feature_input_size
         lstm_dropout = lstm_dropout if self.lstm_num_layers > 1 else 0.0
         self.lstm = nn.LSTM(
             input_size=lstm_input_size,
             hidden_size=lstm_hidden_size,
             num_layers=lstm_num_layers,
             batch_first=True,
-            dropout=lstm_dropout
+            dropout=lstm_dropout,
         )
         self.fc = nn.Sequential(
             nn.Dropout(lstm_dropout),
             nn.Linear(
-                in_features=lstm_hidden_size + self.feature_input_size,
+                in_features=lstm_hidden_size,
                 out_features=output_size,
             )
         )
@@ -134,18 +134,23 @@ class CnnLSTM(nn.Module):
             x_conv = layer(x_conv)
         x_conv = x_conv.permute(0, 2, 1)  # (B, T, C)
 
-        # Pass CNN output through LSTM
-        h0 = torch.zeros(self.lstm_num_layers, x_conv.size(
-            0), self.lstm_hidden_size).to(x_conv.device)
-        c0 = torch.zeros(self.lstm_num_layers, x_conv.size(
-            0), self.lstm_hidden_size).to(x_conv.device)
-        lstm_out, _ = self.lstm(x_conv, (h0, c0))
+        # Expand engineered features to match the sequence length of the CNN output
+        x_features_expanded = x_features.unsqueeze(
+            1).expand(-1, x_conv.size(1), -1)
+
+        # Concatenate CNN output with expanded engineered features
+        lstm_input = torch.cat((x_conv, x_features_expanded), dim=2)
+
+        # Pass combined features through LSTM
+        h0 = torch.zeros(self.lstm_num_layers, lstm_input.size(
+            0), self.lstm_hidden_size).to(lstm_input.device)
+        c0 = torch.zeros(self.lstm_num_layers, lstm_input.size(
+            0), self.lstm_hidden_size).to(lstm_input.device)
+        lstm_out, _ = self.lstm(lstm_input, (h0, c0))
 
         # Get the last hidden state of the LSTM
         last_hidden_state = lstm_out[:, -1, :]
-        # Combine LSTM output with engineered features
-        combined = torch.cat((last_hidden_state, x_features), dim=1)
-        out = self.fc(combined)
+        out = self.fc(last_hidden_state)
 
         return out
 

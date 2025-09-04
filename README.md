@@ -75,7 +75,7 @@ curl -X 'POST' \
   -H 'accept: application/json' \
   -H 'Content-Type: application/json' \
   -d '{
-  "run_id": "2025-08-23_13-32-41",
+  "run_id": "2025-09-04_19-52-23",
   "timestamp": "2020-08-22T14:30:00"
 }'
 ```

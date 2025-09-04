@@ -28,25 +28,24 @@ def objective(trial: optuna.trial.Trial, config: dict, df_trainval: pd.DataFrame
     batch_size = trial.suggest_categorical(
         "batch_size", **training_params['batch_size'])
 
-    model_kwargs = {k: v for k, v in config['model'].items() if k not in [
-        'name']}
-
-    model_kwargs['lstm_hidden_size'] = trial.suggest_categorical(
+    # Build model_kwargs directly from trial suggestions
+    model_kwargs = {}
+    model_kwargs["lstm_hidden_size"] = trial.suggest_categorical(
         "lstm_hidden_size", **model_params['lstm_hidden_size'])
-    model_kwargs['lstm_num_layers'] = trial.suggest_categorical(
+    model_kwargs["lstm_num_layers"] = trial.suggest_categorical(
         "lstm_num_layers", **model_params['lstm_num_layers'])
-    model_kwargs['lstm_dropout'] = trial.suggest_float(
+    model_kwargs["lstm_dropout"] = trial.suggest_float(
         'lstm_dropout', **model_params['lstm_dropout'])
-    model_kwargs['cnn_conv_channels'] = trial.suggest_categorical(
+    model_kwargs["cnn_conv_channels"] = trial.suggest_categorical(
         'cnn_conv_channels', **model_params['cnn_conv_channels'])
-    model_kwargs['cnn_num_conv_layers'] = trial.suggest_categorical(
+    model_kwargs["cnn_num_conv_layers"] = trial.suggest_categorical(
         'cnn_num_conv_layers', **model_params['cnn_num_conv_layers'])
-    model_kwargs['cnn_kernel_size'] = trial.suggest_categorical(
+    model_kwargs["cnn_kernel_size"] = trial.suggest_categorical(
         'cnn_kernel_size', **model_params['cnn_kernel_size'])
-    model_kwargs['cnn_conv_dropout'] = trial.suggest_float(
+    model_kwargs["cnn_conv_dropout"] = trial.suggest_float(
         'cnn_conv_dropout', **model_params['cnn_conv_dropout'])
-    model_kwargs['cnn_kernel_size'] = trial.suggest_categorical(
-        'cnn_kernel_size', **model_params['cnn_kernel_size'])
+    model_kwargs["cnn_use_batchnorm"] = model_params['cnn_use_batchnorm']
+    model_kwargs["cnn_dilation_base"] = model_params['cnn_dilation_base']
 
     # Unpack parameters from config
     target = config['data']['target']
@@ -137,21 +136,24 @@ def main(db_path: str, table_name: str, db_path_weather: str | None = None, tabl
         best_params = study.best_params
     else:
         print("Skipping hyperparameter optimization, using default parameters from config.")
-        best_params = {**config['train'], **config['model']}
+        best_params = {}
+        for section_name in ['train', 'model']:
+            for key, value in config.get(section_name, {}).items():
+                if isinstance(value, dict) and 'type' in value:
+                    if 'choices' in value:
+                        best_params[key] = value['choices'][0]
+                    elif 'low' in value:
+                        best_params[key] = value['low']
+                else:
+                    best_params[key] = value
 
-    best_cfg = config.copy()
-    best_cfg['train']['learning_rate'] = best_params.get('learning_rate')
-    best_cfg['train']['weight_decay'] = best_params.get('weight_decay')
-    best_cfg['train']['batch_size'] = best_params.get('batch_size')
-    best_cfg['model']['lstm_hidden_size'] = best_params.get('lstm_hidden_size')
-    best_cfg['model']['lstm_num_layers'] = best_params.get('lstm_num_layers')
-    best_cfg['model']['cnn_conv_channels'] = best_params.get(
-        'cnn_conv_channels')
-    best_cfg['model']['cnn_num_conv_layers'] = best_params.get(
-        'cnn_num_conv_layers')
-    best_cfg['model']['cnn_kernel_size'] = best_params.get('cnn_kernel_size')
-    best_cfg['model']['cnn_conv_dropout'] = best_params.get('cnn_conv_dropout')
-    best_cfg['model']['lstm_dropout'] = best_params.get('lstm_dropout')
+    best_cfg = yaml.safe_load(yaml.safe_dump(config))  # Deep copy
+    # Update config with the chosen parameters
+    for key, value in best_params.items():
+        if key in best_cfg.get('train', {}):
+            best_cfg['train'][key] = value
+        if key in best_cfg.get('model', {}):
+            best_cfg['model'][key] = value
 
     target = best_cfg['data']['target']
     lookback = best_cfg['data']['lookback']
