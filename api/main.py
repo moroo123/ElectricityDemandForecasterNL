@@ -11,14 +11,13 @@ app = FastAPI(title="Electricity Demand Predictor", version="1.0.0")
 
 RUNS: Dict[str, Path] = {
     '2025-08-23_13-32-41': Path('./models/2025-08-23_13-32-41'),
-    '2025-09-04_19-52-23': Path('./models/2025-09-04_19-52-23')
-
+    '2025-09-05_07-07-46': Path('./models/2025-09-05_07-07-46')
 }
 
 
 class PredictionRequest(BaseModel):
     run_id: str = Field(..., description="ID of the run",
-                        examples=["2025-09-04_19-52-23"])
+                        examples=["2025-09-05_07-07-46"])
     timestamp: Optional[datetime] = Field(
         None, description="Timestamp for the prediction request", examples=["2020-08-22T14:30:00"])
 

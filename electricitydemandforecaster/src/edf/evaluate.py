@@ -73,10 +73,19 @@ def load_artifact(run_dir: Path) -> Tuple[Dict, Dict, torch.nn.Module, StandardS
     model_config = config['model']
     model_cls = MODEL_REGISTRY[model_config['name']]
 
-    sig = inspect.signature(model_cls.__init__)
-    valid_params = {k: v for k, v in model_config.items()
-                    if k in sig.parameters}
+    # Prepare model parameters from config
+    model_params = model_config.copy()
+    model_name = model_params.pop('name')
 
+    # The CnnLSTM has separate inputs for window and features, while BaselineLSTM has one combined input.
+    if model_name == 'BaselineLSTM':
+        model_params['input_size'] = model_params.get(
+            'windows_input_size', 0) + model_params.get('feature_input_size', 0)
+
+    # Filter parameters to match the model's __init__ signature
+    sig = inspect.signature(model_cls.__init__)
+    valid_params = {k: v for k, v in model_params.items()
+                    if k in sig.parameters}
     model = model_cls(**valid_params)
     state_dict = torch.load(
         run_dir / (model_config['name'] + '.pt'), map_location='cpu')
